@@ -137,7 +137,7 @@ because the same systems can appear in multiple train/test splits.
     )
 
     result_df[
-        "significant_after_correction (alpha=0.05)"
+        "different_across_repeated_splits (alpha=0.05)"
     ] = result_df["wilcoxon_p_holm"] < 0.05
 
     return result_df.sort_values("wilcoxon_p_holm")
