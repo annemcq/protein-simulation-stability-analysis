@@ -100,17 +100,17 @@ The resulting ROC-AUC scores were:
 
 ![ROC-AUC across repeated splits](results/repeated_eval_boxplot.png)
 
-The repeated evaluation changes the interpretation of the original single split. Logistic Regression performs better on average, while the Random Forest result is much less consistent.
+The repeated evaluation changes the interpretation of the original single split. Logistic Regression performs better on average, while the Random Forest result is much less consistent. The repeated splits are useful for assessing sensitivity to the train/test partition, but they do not create independent experimental replicates.
 
 I used paired Wilcoxon signed-rank tests across the 30 splits and applied Holm-Bonferroni correction for the three model comparisons.
 
-| Comparison | Holm-corrected p | Significant |
+| Comparison | Holm-corrected p | Different across repeated splits |
 |---|---:|---|
 | Logistic Regression vs Dummy | 0.0049 | Yes |
 | Logistic Regression vs Random Forest | 0.0274 | Yes |
 | Random Forest vs Dummy | 0.1041 | No |
 
-Logistic Regression therefore shows a modest but statistically detectable advantage over the baseline in this evaluation. Random Forest does not show a significant improvement over the dummy classifier.
+Across the repeated resampling splits, Logistic Regression has a higher mean ROC-AUC than the dummy baseline and Random Forest. The paired Wilcoxon comparisons indicate that these differences are unlikely to be explained by the particular split seeds alone in this evaluation. However, the 30 splits are resampling runs of the same 88 systems rather than 30 independent experiments, so these p-values should not be interpreted as conventional evidence of population-level statistical significance. Random Forest does not show a clear improvement over the dummy baseline in this evaluation.
 
 The relatively large variation across splits also shows that performance estimates are uncertain with a dataset of this size.
 
