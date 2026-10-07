@@ -1,4 +1,4 @@
-"""Repeated train/test evaluation and paired significance testing."""
+"""Repeated train/test evaluation and paired split-wise model comparisons."""
 
 from itertools import combinations
 from pathlib import Path
@@ -90,7 +90,12 @@ def paired_significance(
     results_df: pd.DataFrame,
     metric: str = METRIC,
 ) -> pd.DataFrame:
-    """Run paired model comparisons across repeated splits."""
+    """Compare model ROC-AUC values across the same repeated splits.
+
+The p-values describe differences across the repeated resampling runs. They
+should not be interpreted as tests based on independent biological samples,
+because the same systems can appear in multiple train/test splits.
+"""
     wide = results_df.pivot(
         index="repeat",
         columns="model",
@@ -173,7 +178,7 @@ def main():
     )
 
     print(
-        "\n=== Paired significance testing "
+        "\n=== Paired split-wise model comparison "
         "(ROC-AUC, Holm-Bonferroni corrected) ==="
     )
 
@@ -184,6 +189,10 @@ def main():
         None,
     ):
         print(sig_df.to_string(index=False))
+    print(
+        "\nNote: these p-values compare the models across repeated resampling "
+        "splits; they are not tests based on independent experimental systems."
+    )
 
     order = [
         "dummy",
