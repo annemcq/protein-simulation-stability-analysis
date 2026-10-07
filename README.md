@@ -1,281 +1,243 @@
-# Interpretable Machine Learning for Protein Simulation Stability Analysis
+# Protein Simulation Stability Analysis
 
 [![Tests](https://github.com/annemcq/protein-simulation-stability-analysis/actions/workflows/tests.yml/badge.svg)](https://github.com/annemcq/protein-simulation-stability-analysis/actions/workflows/tests.yml)
 
-## Project Overview
+Machine-learning analysis of whether early energy and structural signals from molecular simulations can help predict later deviation from expected thermodynamic behaviour.
 
-This project explores whether **early signals from molecular simulations** can be used to predict **later instability or deviation from expected thermodynamic behavior**.
+The main question was:
 
-The central question is:
-
-> *Can we identify unstable simulation behavior early, using only partial trajectory information?*
-
----
-
-## Motivation
-
-Molecular simulations are computationally expensive, often requiring long trajectories to estimate quantities such as free energy (ΔG).
-
-If instability could be detected early, this would:
-
-* reduce computational cost
-* allow early stopping of problematic simulations
-* improve efficiency of simulation pipelines
-
----
+> Can information from the beginning of a simulation help identify systems that are likely to behave abnormally later?
 
 ## Dataset
 
-The dataset consists of ~100 protein systems, each with:
+The analysis uses molecular simulation data from approximately 90 protein systems.
 
-* energy trajectories (~1000 frames)
-* three components:
+For each system, energy trajectories were available for three components:
 
-  * complex
-  * no-peptide
-  * peptide
+- protein complex
+- complex without peptide
+- peptide
 
-From these, we compute:
+These were combined into an interaction-energy trajectory:
 
-ΔV(t) = E_complex − (E_nopep + E_pep)
+\[
+\Delta V(t) = E_{\mathrm{complex}} -
+(E_{\mathrm{nopep}} + E_{\mathrm{pep}})
+\]
 
-Additionally, raw trajectory coordinates were available as `.npy` files and used to compute structural features.
+Structural trajectories were also available and used to calculate RMSD-based features.
 
----
+Only the first 20% of each trajectory was used for feature extraction, so that the models only had access to information from the early part of the simulation.
 
-## Methodology
+After merging the available energy, structural and target data and filtering the most extreme target values, the final dataset contains 88 systems.
 
-### Feature Engineering
+## Features
 
-Features are extracted from the **first 20% of each trajectory**, simulating an early prediction scenario.
+Energy features summarize the early ΔV trajectory:
 
-#### Energy-based features
+- mean and standard deviation
+- minimum, maximum and range
+- slope
+- drift
+- contrast between different parts of the early trajectory
+- fluctuation ratio
 
-* mean, standard deviation
-* min, max, range
-* slope (trend over time)
-* drift (difference between early and late halves)
-* contrast (first vs last quarter)
-* fluctuation ratio
+Three structural features were calculated from RMSD relative to the first trajectory frame:
 
-#### Structural features (RMSD)
+- mean RMSD
+- RMSD standard deviation
+- RMSD slope
 
-From raw trajectory coordinates:
+The final models use 12 features in total.
 
-* mean RMSD
-* standard deviation of RMSD
-* RMSD slope
+## Target
 
-RMSD is computed relative to the first frame of the trajectory.
+The prediction target is derived from `Perp_dist`, which measures deviation from a fitted ΔG relationship.
 
----
+Systems below the median `Perp_dist` are assigned to the low-deviation class and systems above the median to the high-deviation class.
 
-### Label Definition
-
-The target is based on:
-
-* **Perp_dist**: distance to a fitted ΔG trend
-
-This measures how much a system deviates from expected thermodynamic behavior.
-
-We define:
-
-* `0` → low deviation (stable)
-* `1` → high deviation (unstable)
-
-using a median split.
-
----
+After preprocessing, the final dataset contains 44 systems in each class.
 
 ## Models
 
-Three models were evaluated:
+I compared three models:
 
-* Dummy classifier (baseline)
-* Logistic Regression (interpretable linear model)
-* Random Forest (nonlinear model with feature importance)
+- Dummy classifier
+- Logistic Regression
+- Random Forest
 
----
+Logistic Regression uses standardized features. The Dummy classifier provides a baseline for determining whether the trajectory features contain useful predictive information.
 
-## Results
+ROC-AUC is used as the main evaluation metric.
 
-### Model Performance
+## Initial evaluation
 
-* Logistic Regression: ROC-AUC ≈ 0.54
-* Random Forest: ROC-AUC ≈ 0.55
-* Dummy baseline: ROC-AUC = 0.50
+I initially evaluated the models using a single stratified 80/20 train/test split.
 
-The models outperform the baseline slightly, indicating the presence of **weak but real predictive signal**.
+On this split, both machine-learning models were only slightly above the dummy baseline:
 
----
+| Model | ROC-AUC |
+|---|---:|
+| Dummy | 0.50 |
+| Logistic Regression | ~0.54 |
+| Random Forest | ~0.55 |
 
-### Model Comparison
+Because the test set contains only 18 systems, these numbers are sensitive to the particular train/test split.
 
-![Model Comparison](results/model_comparison.png)
+This motivated a repeated evaluation rather than relying on the initial result.
 
----
+## Repeated evaluation
 
-### Feature Importance (Random Forest)
+I repeated the stratified train/test split 30 times, evaluating all three models on the same data partition within each repeat.
 
-Most important features:
-
-* drift of ΔV
-* mean energy
-* slope of ΔV
-* standard deviation of energy
-
-Structural features (RMSD) contributed less strongly.
-
----
-
-## Follow-up: Is the Signal Real? (Repeated Evaluation + SHAP)
-
-The results above come from a **single** train/test split (18 test systems out of ~90
-total). With a test set that small, the gap between the dummy baseline (ROC-AUC 0.50) and
-the two models could easily be an artifact of that one particular split rather than a real
-effect. `src/repeated_cv_evaluation.py` repeats the split 30 times (different random seed
-each time), evaluates all three models on the same split within each repeat, and runs a
-paired Wilcoxon signed-rank test (Holm-Bonferroni corrected across the 3 pairwise
-comparisons) — the same statistical approach used in the tcr-peptide-ranking project.
-
-**This changes the story.** Across 30 repeats:
+The resulting ROC-AUC scores were:
 
 | Model | Mean ROC-AUC | Std |
-|---|---|---|
-| Dummy baseline | 0.500 | 0.000 |
+|---|---:|---:|
+| Dummy | 0.500 | 0.000 |
 | Logistic Regression | **0.597** | 0.137 |
 | Random Forest | 0.542 | 0.125 |
 
 ![ROC-AUC across repeated splits](results/repeated_eval_boxplot.png)
 
-The paired significance test (`results/paired_significance_roc_auc.csv`) shows:
-- **Logistic Regression significantly beats the dummy baseline** (Holm-corrected p ≈ 0.005)
-  and **significantly beats Random Forest** (p ≈ 0.027).
-- **Random Forest is *not* significantly better than the dummy baseline** (p ≈ 0.10).
+The repeated evaluation changes the interpretation of the original single split. Logistic Regression performs better on average, while the Random Forest result is much less consistent.
 
-So the "weak but real predictive signal" from the original single-split analysis is real —
-but it's coming from **Logistic Regression**, not Random Forest as the original single split
-happened to suggest. Random Forest's apparent edge over baseline in that one split doesn't
-hold up under repetition.
+I used paired Wilcoxon signed-rank tests across the 30 splits and applied Holm-Bonferroni correction for the three model comparisons.
 
-**What this means for the feature importance analysis above:** since Random Forest isn't
-reliably better than chance, its `feature_importances_` ranking (and the SHAP analysis
-below) should be read as "what this particular model leans on", not as confirmed evidence
-of real predictive biology.
+| Comparison | Holm-corrected p | Significant |
+|---|---:|---|
+| Logistic Regression vs Dummy | 0.0049 | Yes |
+| Logistic Regression vs Random Forest | 0.0274 | Yes |
+| Random Forest vs Dummy | 0.1041 | No |
 
-### SHAP-based interpretability 
+Logistic Regression therefore shows a modest but statistically detectable advantage over the baseline in this evaluation. Random Forest does not show a significant improvement over the dummy classifier.
 
-The original feature importance relied on Random Forest’s built-in `feature_importances_`, which is based on impurity and can be biased toward features with higher variance. To make the interpretation more robust, `src/shap_analysis.py` instead calculates SHAP values on a held-out test set:
+The relatively large variation across splits also shows that performance estimates are uncertain with a dataset of this size.
+
+## Feature interpretation
+
+The original analysis used the Random Forest's impurity-based feature importance. Energy-derived variables such as drift, mean and slope of ΔV appeared among the most important features.
+
+I later repeated the interpretation using SHAP values calculated on a held-out test split.
 
 ![SHAP feature importance](results/shap_feature_importance.png)
 
-This highlights that the top features are broadly consistent with the original ranking  (`drift_deltaV`,
-`mean_deltaV`, `slope_deltaV` all remain near the top), with `std_deltaV` ranking at the very top. Going back to the aforementioned caveat, these results need to be read in the context of the model's descriptive behaviour, rather than strictly a biological finding.
+The highest mean absolute SHAP values were associated with:
 
----
+| Feature | Mean \|SHAP value\| |
+|---|---:|
+| `std_deltaV` | 0.0416 |
+| `mean_deltaV` | 0.0382 |
+| `drift_deltaV` | 0.0346 |
+| `slope_deltaV` | 0.0317 |
+| `std_rmsd` | 0.0293 |
 
-## Key Insights
+The energy-derived features remain prominent, while the simple RMSD summaries contribute less overall.
 
-* Early energy signals contain **limited predictive information** about long-term stability.
-* Temporal features (drift and contrast) are more informative than static statistics.
-* The predictive signal is weak, suggesting that simple summary features are insufficient.
+However, these importances should be interpreted cautiously. The Random Forest itself was not significantly better than the dummy baseline in the repeated evaluation, so the SHAP analysis describes what this particular model relies on rather than establishing these features as biological predictors of simulation stability.
 
----
+## What I learned
 
-## Extension: Structural Features
+The main result of the project was not a high-performing classifier. Instead, the repeated evaluation showed how unstable conclusions can be when working with a small scientific dataset.
 
-To improve performance, structural features based on RMSD were added.
+The initial split suggested that Random Forest performed slightly better than Logistic Regression. Across repeated splits, that conclusion did not hold: Logistic Regression performed better on average and was the only model that consistently separated itself from the baseline.
 
-Still, this **did not improve model performance**.
+Adding simple RMSD-based structural features also did not lead to a strong predictive model.
 
-This suggests that:
+Overall, the results suggest that early trajectory summaries contain some information about later behaviour, but that the signal is limited and highly variable across train/test splits.
 
-* simple structural summaries (such as RMSD) are too coarse
-* relevant structural information is not captured by global distance measures
+More detailed structural representations, time-dependent features or larger datasets would be needed before using this type of model for reliable early stopping of simulations.
 
-More expressive structural representations (e.g. contacts or learned embeddings) may be required.
+## Repository structure
 
----
+```text
+protein-simulation-stability-analysis/
+├── data/
+│   ├── project3_energy_features.csv
+│   ├── project3_structure_features.csv
+│   ├── project3_final_dataset.csv
+│   └── rank_by_distance_to_fit_deltaG_fep_BOOTSTRAP.csv
+│
+├── results/
+│   ├── model_comparison.png
+│   ├── repeated_eval_all_results.csv
+│   ├── repeated_eval_boxplot.png
+│   ├── paired_significance_roc_auc.csv
+│   ├── shap_feature_importance.csv
+│   └── shap_feature_importance.png
+│
+├── src/
+│   ├── build_dataset.py
+│   ├── extract_energy_features.py
+│   ├── train_models.py
+│   ├── repeated_cv_evaluation.py
+│   └── shap_analysis.py
+│
+├── tests/
+│   └── test_models_and_stats.py
+│
+├── requirements.txt
+└── README.md
+```
 
-## What Didn’t Work
+## Reproducing the analysis
 
-* Adding RMSD-based features did not improve predictive performance
-* Classification accuracy remained close to baseline
-* Simple feature engineering was insufficient to capture the full signal
-
----
-
-## Interpretation
-
-These results indicate that:
-
-> Early trajectory summaries (both energy and RMSD) are not sufficient to reliably predict simulation stability.
-
-This in turn, points toward the following:
-
-* stability depends on more complex structural patterns
-* richer representations or time-dependent models are needed
-
----
-
-## Future Work
-
-In the context of the results obtained, the following avenues emerge for future work:
-
-* incorporating structural features such as contact maps or residue interactions
-* using time-series models instead of summary statistics
-* predicting Perp_dist directly (regression)
-* combining sequence, structure, and simulation features
-* applying deep learning to learn representations from raw trajectories
-
----
-
-## Data Availability
-
-Raw simulation data is not included in this repository.
-
-The project provides:
-
-* processed datasets
-* feature extraction pipelines
-* modeling scripts
-
----
-
-## How to Reproduce
+Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
-
-python src/build_dataset.py            # merges energy + structure features with labels
-python src/train_models.py             # single train/test split, matches the numbers above
-python src/repeated_cv_evaluation.py   # 30 repeated splits + paired significance test
-python src/shap_analysis.py            # real SHAP feature importance
-
-pytest tests/
 ```
 
-Note: `src/extract_energy_features.py` (raw trajectory -> structural features) needs the
-raw trajectory data, which is not included in this repository (see Data Availability
-below). This documents the pipeline as originally run rather than being directly
-runnable here.
+Rebuild the final dataset from the processed feature tables:
 
-## Tech Stack
+```bash
+python src/build_dataset.py
+```
 
-* Python
-* NumPy / pandas
-* scikit-learn
-* PyTorch (data handling)
-* matplotlib
+Run the original single-split analysis:
 
----
+```bash
+python src/train_models.py
+```
 
-## Conclusion
+Run the 30-split evaluation and statistical comparisons:
 
-All in all, the current project represents a comprehensive machine learning pipeline applied to molecular simulation data and illustrates both the **potential and limitations** of early prediction.
+```bash
+python src/repeated_cv_evaluation.py
+```
 
-As discussed, the results emphasize that:
+Run the SHAP analysis:
 
-> Simple early features provide only weak signal, and more expressive representations are needed to model simulation stability effectively.
+```bash
+python src/shap_analysis.py
+```
 
----
+Run the tests:
+
+```bash
+python -m pytest
+```
+
+## Data availability
+
+The processed datasets required to reproduce the model training and evaluation are included in the repository.
+
+The original molecular simulation trajectories are not included because of their size and source-data constraints. `src/extract_energy_features.py` documents the RMSD feature-extraction step but requires access to the original trajectory files.
+
+## Limitations
+
+This is a small dataset, with 88 systems in the final analysis. The variability across repeated splits reflects that limitation.
+
+The binary target is also a simplification of a continuous quantity (`Perp_dist`). A larger dataset could make direct regression on this quantity more useful.
+
+Finally, the structural representation used here is deliberately simple. Global RMSD statistics cannot capture many local conformational changes or interaction patterns that may be relevant to simulation stability.
+
+Possible extensions would include contact-based structural features, residue-level interaction descriptors or models that use the trajectory as a time series rather than reducing it to summary statistics.
+
+## Tools
+
+Python, NumPy, pandas, scikit-learn, SciPy, MDTraj, SHAP and matplotlib.
+
+## License
+
+This project is available under the MIT License.
