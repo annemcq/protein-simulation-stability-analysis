@@ -51,6 +51,21 @@ df = pd.merge(df, labels, on="pdb", how="inner")
 print("Merged dataset:", df.shape)
 
 # ============================================================
+# REMOVE EXTREME TARGET OUTLIERS
+# ============================================================
+#
+# Filter the target distribution before defining the binary label,
+# so the median threshold is calculated on the exact dataset used
+# for model training and evaluation.
+
+q_low = df["Perp_dist"].quantile(0.01)
+q_high = df["Perp_dist"].quantile(0.99)
+
+df = df[(df["Perp_dist"] >= q_low) & (df["Perp_dist"] <= q_high)].copy()
+
+print("\nAfter outlier filtering:", df.shape)
+
+# ============================================================
 # CREATE LABEL (median split)
 # ============================================================
 
@@ -61,17 +76,6 @@ df["label"] = (df["Perp_dist"] > threshold).astype(int)
 print("Threshold (median Perp_dist):", threshold)
 print("\nLabel distribution:")
 print(df["label"].value_counts())
-
-# ============================================================
-# OPTIONAL: REMOVE EXTREME OUTLIERS
-# ============================================================
-
-q_low = df["Perp_dist"].quantile(0.01)
-q_high = df["Perp_dist"].quantile(0.99)
-
-df = df[(df["Perp_dist"] >= q_low) & (df["Perp_dist"] <= q_high)].copy()
-
-print("\nAfter outlier filtering:", df.shape)
 
 # ============================================================
 # SAVE
