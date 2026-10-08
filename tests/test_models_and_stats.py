@@ -12,6 +12,7 @@ from sklearn.linear_model import LogisticRegression
 
 from src.train_models import evaluate_model, build_models, FEATURE_COLS
 from src.repeated_cv_evaluation import holm_bonferroni, run_repeated_evaluation, paired_significance
+from src.permutation_test import cross_validated_roc_auc, permutation_test
 
 
 def test_build_models_returns_three_named_models():
@@ -82,3 +83,28 @@ def test_paired_significance_detects_real_signal_on_synthetic_data():
     ]
     assert len(row) == 1
     assert row.iloc[0]["wilcoxon_p_holm"] < 0.05
+
+
+def test_cross_validated_roc_auc_returns_valid_score():
+    df = _make_synthetic_dataset(n=100, seed=7)
+    score = cross_validated_roc_auc(
+        df[FEATURE_COLS].values,
+        df["label"].values,
+        n_splits=5,
+    )
+    assert 0.5 <= score <= 1.0
+
+
+def test_permutation_test_returns_valid_null_distribution():
+    df = _make_synthetic_dataset(n=100, seed=8)
+    observed, null_scores, p_value = permutation_test(
+        df[FEATURE_COLS].values,
+        df["label"].values,
+        n_permutations=20,
+        n_splits=5,
+        random_state=0,
+    )
+    assert len(null_scores) == 20
+    assert np.all((null_scores >= 0.0) & (null_scores <= 1.0))
+    assert 0.0 <= observed <= 1.0
+    assert 0.0 < p_value <= 1.0
