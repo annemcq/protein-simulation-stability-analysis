@@ -89,6 +89,8 @@ The holdout estimate is higher but substantially more variable. The repeated 5-f
 
 This makes the repeated 5-fold estimate the more appropriate primary performance summary for this small dataset.
 
+To compare **all three models under the same repeated 5-fold protocol**, `src/compare_resampling_protocols.py` now evaluates Dummy, Logistic Regression, and Random Forest on each of the same 30 seeded five-fold partitions, using out-of-fold probabilities to calculate ROC-AUC for each repeat. It saves their mean, standard deviation, median, and range to `results/repeated_5fold_model_comparison.csv`. The original table above compares resampling protocols for Logistic Regression only; it should not be used to infer a Random Forest–Dummy difference. Run the script and add the generated three-model results here before drawing that comparison.
+
 ![ROC-AUC across repeated splits](results/repeated_eval_boxplot.png)
 
 ### Label-permutation test
