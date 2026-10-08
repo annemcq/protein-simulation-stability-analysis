@@ -21,15 +21,17 @@ For each system, energy trajectories were available for three components:
 These were combined into an interaction-energy trajectory:
 
 \[
+$
 \Delta V(t) = E_{\mathrm{complex}} -
 (E_{\mathrm{nopep}} + E_{\mathrm{pep}})
+$
 \]
 
 Structural trajectories were also available and used to calculate RMSD-based features.
 
 Only the first 20% of each trajectory was used for feature extraction, so that the models only had access to information from the early part of the simulation.
 
-After merging the available energy, structural and target data and filtering the most extreme target values, the final dataset contains 88 systems.
+After merging the available energy, structural and target data, 90 systems were available. I removed the lowest and highest 1% of the target distribution (`Perp_dist`) before defining the median split, which removed 2 systems and left 88 systems for analysis.
 
 ## Features
 
@@ -111,7 +113,7 @@ The earlier paired Wilcoxon comparisons across repeated 80/20 splits remain usef
 
 Taken together, the more conservative interpretation is that **the current dataset does not provide convincing evidence that the trajectory-derived features have reproducible predictive power for the stability label**.
 
-This is an important result of the analysis rather than a failure of the modelling exercise: the project demonstrates how apparently positive performance estimates can weaken when evaluated under more stable resampling and label-permutation controls.
+The project demonstrates how apparently positive performance estimates can weaken when evaluated under more stable resampling and label-permutation controls.
 
 ## Feature interpretation
 
@@ -168,6 +170,8 @@ protein-simulation-stability-analysis/
 │   ├── extract_energy_features.py
 │   ├── train_models.py
 │   ├── repeated_cv_evaluation.py
+│   ├── compare_resampling_protocols.py
+│   ├── permutation_test.py
 │   └── shap_analysis.py
 │
 ├── tests/
@@ -202,6 +206,20 @@ Run the 30-split evaluation and statistical comparisons:
 ```bash
 python src/repeated_cv_evaluation.py
 ```
+
+Compare the repeated 80/20 holdout and repeated 5-fold protocols:
+
+```bash
+python src/compare_resampling_protocols.py
+```
+
+Run the label-permutation test:
+
+```bash
+python src/permutation_test.py
+```
+
+This permutation test repeats 30 five-fold CV runs for each of 200 label permutations and can take substantially longer than the other analyses.
 
 Run the SHAP analysis:
 
