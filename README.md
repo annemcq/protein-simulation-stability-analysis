@@ -111,7 +111,6 @@ The earlier paired Wilcoxon comparisons across repeated 80/20 splits remain usef
 
 Taken together, the more conservative interpretation is that **the current dataset does not provide convincing evidence that the trajectory-derived features have reproducible predictive power for the stability label**.
 
-The project demonstrates how apparently positive performance estimates can weaken when evaluated under more stable resampling and label-permutation controls.
 
 ## Feature interpretation
 
