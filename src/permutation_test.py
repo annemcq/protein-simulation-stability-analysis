@@ -21,6 +21,7 @@ except ImportError:
 
 
 N_PERMUTATIONS = 1000
+N_REPEATS = 30
 N_SPLITS = 5
 RANDOM_STATE = 42
 
@@ -48,25 +49,42 @@ def cross_validated_roc_auc(
     return roc_auc_score(y, probabilities)
 
 
+def repeated_cv_roc_auc(
+    X: np.ndarray,
+    y: np.ndarray,
+    n_repeats: int = N_REPEATS,
+    n_splits: int = N_SPLITS,
+) -> float:
+    """Return mean ROC-AUC across repeated stratified 5-fold CV."""
+    scores = [
+        cross_validated_roc_auc(X, y, n_splits=n_splits, random_state=seed)
+        for seed in range(n_repeats)
+    ]
+    return float(np.mean(scores))
+
+
 def permutation_test(
     X: np.ndarray,
     y: np.ndarray,
     n_permutations: int = N_PERMUTATIONS,
+    n_repeats: int = N_REPEATS,
     n_splits: int = N_SPLITS,
     random_state: int = RANDOM_STATE,
 ):
-    """Compare observed CV ROC-AUC with a label-permutation null distribution."""
+    """Compare repeated-CV ROC-AUC with a label-permutation null distribution.
+
+    The observed statistic and every null replicate use the same 30-repeat,
+    stratified 5-fold CV protocol, aligning the permutation test with the
+    primary performance estimate.
+    """
     rng = np.random.default_rng(random_state)
-    observed = cross_validated_roc_auc(X, y, n_splits, random_state)
+    observed = repeated_cv_roc_auc(X, y, n_repeats, n_splits)
 
     null_scores = np.empty(n_permutations)
     for i in range(n_permutations):
         y_perm = rng.permutation(y)
-        null_scores[i] = cross_validated_roc_auc(
-            X,
-            y_perm,
-            n_splits,
-            random_state,
+        null_scores[i] = repeated_cv_roc_auc(
+            X, y_perm, n_repeats, n_splits
         )
 
     # Add-one correction avoids a zero p-value and gives a conservative
@@ -74,7 +92,6 @@ def permutation_test(
     p_value = (1 + np.sum(null_scores >= observed)) / (n_permutations + 1)
 
     return observed, null_scores, p_value
-
 
 def main():
     df = pd.read_csv(DATA_PATH)
@@ -100,6 +117,7 @@ def main():
             "null_95th_percentile": np.quantile(null_scores, 0.95),
             "permutation_p_value": p_value,
             "n_permutations": N_PERMUTATIONS,
+            "n_repeats": N_REPEATS,
             "n_splits": N_SPLITS,
         }]
     )
@@ -127,12 +145,13 @@ def main():
     )
 
     print("=== Logistic Regression label-permutation test ===")
-    print(f"Observed 5-fold CV ROC-AUC: {observed:.4f}")
+    print(f"Observed repeated 5-fold CV ROC-AUC: {observed:.4f}")
     print(f"Null mean +/- std: {null_scores.mean():.4f} +/- {null_scores.std(ddof=1):.4f}")
     print(f"Null 95th percentile: {np.quantile(null_scores, 0.95):.4f}")
     print(f"Permutation p-value: {p_value:.4f}")
     print(f"Permutations: {N_PERMUTATIONS}")
-    print(f"CV folds: {N_SPLITS}")
+    print(f"CV repeats: {N_REPEATS}")
+    print(f"CV folds per repeat: {N_SPLITS}")
     print("\nSaved:", results_dir / "logreg_permutation_test.csv")
     print("Saved:", results_dir / "logreg_permutation_test.png")
 
