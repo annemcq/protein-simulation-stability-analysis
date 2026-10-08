@@ -96,7 +96,7 @@ def main():
     results_dir.mkdir(exist_ok=True)
     summary.to_csv(results_dir / "resampling_protocol_comparison.csv", index=False)
     cv5_summary.to_csv(results_dir / "repeated_5fold_model_comparison.csv", index=False)
-    print("\\n=== 30x repeated 5-fold CV: all models ===")
+    print("\n=== 30x repeated 5-fold CV: all models ===")
     print(cv5_summary.to_string(index=False))
 
     print("=== Resampling protocol comparison: Logistic Regression ===")
