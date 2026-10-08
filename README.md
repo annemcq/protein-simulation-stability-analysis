@@ -89,7 +89,17 @@ The holdout estimate is higher but substantially more variable. The repeated 5-f
 
 This makes the repeated 5-fold estimate the more appropriate primary performance summary for this small dataset.
 
-To compare **all three models under the same repeated 5-fold protocol**, `src/compare_resampling_protocols.py` now evaluates Dummy, Logistic Regression, and Random Forest on each of the same 30 seeded five-fold partitions, using out-of-fold probabilities to calculate ROC-AUC for each repeat. It saves their mean, standard deviation, median, and range to `results/repeated_5fold_model_comparison.csv`. The original table above compares resampling protocols for Logistic Regression only; it should not be used to infer a Random Forest–Dummy difference. Run the script and add the generated three-model results here before drawing that comparison.
+To compare **all three models under the same repeated 5-fold protocol**, I evaluated Dummy, Logistic Regression, and Random Forest on 30 seeded five-fold partitions. Each repeat calculates ROC-AUC from pooled out-of-fold probabilities. The results were:
+
+| Model | Mean ROC-AUC | Std | Median | Range |
+|---|---:|---:|---:|---:|
+| Dummy (most frequent) | 0.489 | 0.000 | 0.489 | 0.489–0.489 |
+| Logistic Regression | **0.545** | 0.038 | 0.548 | 0.463–0.606 |
+| Random Forest | 0.514 | 0.035 | 0.514 | 0.450–0.589 |
+
+Random Forest is only slightly above the dummy baseline in mean ROC-AUC (0.514 vs. 0.489). These descriptive results do not establish a statistically significant advantage: the same 88 systems recur across the 30 partitions. Logistic Regression also remains close to chance, consistent with the permutation test reported below. The dummy's pooled ROC-AUC is 0.489 rather than exactly 0.5 because the metric is computed on pooled out-of-fold predictions, not separately within each fold.
+
+Reproduce this comparison with `python src/compare_resampling_protocols.py`, which writes `results/repeated_5fold_model_comparison.csv`. The protocol-comparison table above applies to Logistic Regression only.
 
 ![ROC-AUC across repeated splits](results/repeated_eval_boxplot.png)
 
