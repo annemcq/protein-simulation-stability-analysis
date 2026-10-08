@@ -20,12 +20,10 @@ For each system, energy trajectories were available for three components:
 
 These were combined into an interaction-energy trajectory:
 
-\[
 $
 \Delta V(t) = E_{\mathrm{complex}} -
 (E_{\mathrm{nopep}} + E_{\mathrm{pep}})
 $
-\]
 
 Structural trajectories were also available and used to calculate RMSD-based features.
 
