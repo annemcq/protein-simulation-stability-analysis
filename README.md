@@ -70,49 +70,48 @@ Logistic Regression uses standardized features. The Dummy classifier provides a 
 
 ROC-AUC is used as the main evaluation metric.
 
-## Initial evaluation
+## Evaluation strategy
 
-I initially evaluated the models using a single stratified 80/20 train/test split.
+I initially evaluated the models using a single stratified 80/20 train/test split. Because the test set contains only 18 systems, the resulting ROC-AUC is sensitive to which observations happen to be held out.
 
-On this split, both machine-learning models were only slightly above the dummy baseline:
+I therefore added two complementary resampling analyses.
 
-| Model | ROC-AUC |
-|---|---:|
-| Dummy | 0.50 |
-| Logistic Regression | ~0.54 |
-| Random Forest | ~0.55 |
+### Repeated evaluation
 
-Because the test set contains only 18 systems, these numbers are sensitive to the particular train/test split.
+I compared 30 repeated stratified 80/20 holdout splits with 30 repeated stratified 5-fold cross-validation runs for Logistic Regression:
 
-This motivated a repeated evaluation rather than relying on the initial result.
+| Protocol | Mean ROC-AUC | Std | Median | Range |
+|---|---:|---:|---:|---:|
+| 30× stratified 80/20 holdout | **0.597** | 0.137 | 0.611 | 0.358–0.889 |
+| 30× repeated 5-fold CV | **0.545** | 0.038 | 0.548 | 0.463–0.606 |
 
-## Repeated evaluation
+The holdout estimate is higher but substantially more variable. The repeated 5-fold estimate is more stable because every observation contributes to out-of-fold evaluation across the repeated partitions.
 
-I repeated the stratified train/test split 30 times, evaluating all three models on the same data partition within each repeat.
-
-The resulting ROC-AUC scores were:
-
-| Model | Mean ROC-AUC | Std |
-|---|---:|---:|
-| Dummy | 0.500 | 0.000 |
-| Logistic Regression | **0.597** | 0.137 |
-| Random Forest | 0.542 | 0.125 |
+This makes the repeated 5-fold estimate the more appropriate primary performance summary for this small dataset.
 
 ![ROC-AUC across repeated splits](results/repeated_eval_boxplot.png)
 
-The repeated evaluation changes the interpretation of the original single split. Logistic Regression performs better on average, while the Random Forest result is much less consistent. The repeated splits are useful for assessing sensitivity to the train/test partition, but they do not create independent experimental replicates.
+### Label-permutation test
 
-I used paired Wilcoxon signed-rank tests across the 30 splits and applied Holm-Bonferroni correction for the three model comparisons.
+To test whether the observed Logistic Regression performance could arise from arbitrary associations between features and labels, I performed a label-permutation test using the same repeated 5-fold protocol as the primary evaluation.
 
-| Comparison | Holm-corrected p | Different across repeated splits |
-|---|---:|---|
-| Logistic Regression vs Dummy | 0.0049 | Yes |
-| Logistic Regression vs Random Forest | 0.0274 | Yes |
-| Random Forest vs Dummy | 0.1041 | No |
+The observed mean ROC-AUC was **0.5454**. Across 200 label permutations, the null distribution had a mean of **0.4921**, standard deviation **0.0737**, and 95th percentile **0.6147**.
 
-Across the repeated resampling splits, Logistic Regression has a higher mean ROC-AUC than the dummy baseline and Random Forest. The paired Wilcoxon comparisons indicate that these differences are unlikely to be explained by the particular split seeds alone in this evaluation. However, the 30 splits are resampling runs of the same 88 systems rather than 30 independent experiments, so these p-values should not be interpreted as conventional evidence of population-level statistical significance. Random Forest does not show a clear improvement over the dummy baseline in this evaluation.
+The permutation p-value was **0.2438**.
 
-The relatively large variation across splits also shows that performance estimates are uncertain with a dataset of this size.
+![Logistic Regression label-permutation test](results/logreg_permutation_test.png)
+
+Thus, the observed performance is not sufficiently separated from the permutation null distribution to reject the hypothesis that the apparent predictive signal could be explained by chance.
+
+The permutation test uses 200 permutations because each permutation repeats the full 30×5-fold evaluation protocol. This is an intentionally computationally heavier robustness check rather than a claim of high-precision p-value estimation.
+
+### Statistical interpretation
+
+The earlier paired Wilcoxon comparisons across repeated 80/20 splits remain useful for describing differences between resampling runs, but they should not be interpreted as independent experimental evidence because all repeats reuse the same 88 systems.
+
+Taken together, the more conservative interpretation is that **the current dataset does not provide convincing evidence that the trajectory-derived features have reproducible predictive power for the stability label**.
+
+This is an important result of the analysis rather than a failure of the modelling exercise: the project demonstrates how apparently positive performance estimates can weaken when evaluated under more stable resampling and label-permutation controls.
 
 ## Feature interpretation
 
@@ -138,15 +137,13 @@ However, these importances should be interpreted cautiously. The Random Forest i
 
 ## What I learned
 
-The main result of the project was not a high-performing classifier. Instead, the repeated evaluation showed how unstable conclusions can be when working with a small scientific dataset.
+The main result of the project was not a high-performing classifier. Instead, the analysis showed how easily conclusions can change when working with a small scientific dataset.
 
-The initial split suggested that Random Forest performed slightly better than Logistic Regression. Across repeated splits, that conclusion did not hold: Logistic Regression performed better on average and was the only model that consistently separated itself from the baseline.
+The initial holdout analysis produced a moderately positive Logistic Regression estimate, but repeated 5-fold cross-validation reduced this to **0.545 ± 0.038 ROC-AUC**. The label-permutation test also failed to reject the null hypothesis (**p = 0.244**).
 
-Adding simple RMSD-based structural features also did not lead to a strong predictive model.
+Adding simple RMSD-based structural features did not produce a strong predictive model, and the Random Forest did not show a clear improvement over the dummy baseline.
 
-Overall, the results suggest that early trajectory summaries contain some information about later behaviour, but that the signal is limited and highly variable across train/test splits.
-
-More detailed structural representations, time-dependent features or larger datasets would be needed before using this type of model for reliable early stopping of simulations.
+Overall, the current data do not provide convincing evidence that early trajectory summaries can reliably predict later simulation stability. More detailed structural representations, time-dependent features, stronger validation on independent systems, or a larger dataset would be needed before using this type of model for reliable early stopping of simulations.
 
 ## Repository structure
 
