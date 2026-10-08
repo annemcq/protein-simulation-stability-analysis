@@ -101,6 +101,8 @@ The permutation p-value was **0.2438**.
 
 ![Logistic Regression label-permutation test](results/logreg_permutation_test.png)
 
+The one-sided permutation p-value uses the standard +1 correction: (1 + number of permuted scores at least as large as observed) / (200 + 1) = 49/201 = 0.2438.
+
 Thus, the observed performance is not sufficiently separated from the permutation null distribution to reject the hypothesis that the apparent predictive signal could be explained by chance.
 
 The permutation test uses 200 permutations because each permutation repeats the full 30×5-fold evaluation protocol. This is an intentionally computationally heavier robustness check rather than a claim of high-precision p-value estimation.
@@ -159,6 +161,10 @@ protein-simulation-stability-analysis/
 │   ├── repeated_eval_all_results.csv
 │   ├── repeated_eval_boxplot.png
 │   ├── paired_significance_roc_auc.csv
+│   ├── logreg_permutation_null.csv
+│   ├── logreg_permutation_test.csv
+│   ├── logreg_permutation_test.png
+│   ├── resampling_protocol_comparison.csv
 │   ├── shap_feature_importance.csv
 │   └── shap_feature_importance.png
 │
