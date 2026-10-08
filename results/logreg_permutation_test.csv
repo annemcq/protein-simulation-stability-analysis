@@ -1,0 +1,2 @@
+model,observed_cv_roc_auc,null_mean,null_std,null_95th_percentile,permutation_p_value,n_permutations,n_repeats,n_splits
+logreg,0.5453512396694215,0.4920502754820937,0.07365243498830365,0.614670282369146,0.24378109452736318,200,30,5
