@@ -132,7 +132,7 @@ The highest mean absolute SHAP values were associated with:
 
 The energy-derived features remain prominent, while the simple RMSD summaries contribute less overall.
 
-However, these importances should be interpreted cautiously. The Random Forest itself was not significantly better than the dummy baseline in the repeated evaluation, so the SHAP analysis describes what this particular model relies on rather than establishing these features as biological predictors of simulation stability.
+However, these importances should be interpreted cautiously. The Random Forest did not consistently outperform the dummy baseline across the repeated splits; because those splits reuse the same 88 systems, this comparison is descriptive rather than independent evidence of a performance difference. The SHAP analysis therefore describes what this particular model relies on rather than establishing these features as biological predictors of simulation stability.
 
 ## What I learned
 
