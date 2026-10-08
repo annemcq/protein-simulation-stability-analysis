@@ -20,7 +20,7 @@ except ImportError:
     from train_models import build_models, DATA_PATH, FEATURE_COLS, BASE
 
 
-N_PERMUTATIONS = 1000
+N_PERMUTATIONS = 200
 N_REPEATS = 30
 N_SPLITS = 5
 RANDOM_STATE = 42
@@ -86,6 +86,8 @@ def permutation_test(
         null_scores[i] = repeated_cv_roc_auc(
             X, y_perm, n_repeats, n_splits
         )
+        if (i + 1) % 25 == 0 or i == 0:
+            print(f"Permutation {i + 1}/{n_permutations}", flush=True)
 
     # Add-one correction avoids a zero p-value and gives a conservative
     # finite-sample permutation p-value.
