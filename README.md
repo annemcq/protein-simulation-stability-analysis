@@ -301,9 +301,9 @@ python -m pytest
 
 The processed datasets required to reproduce the model training and evaluation are included in the repository.
 
-The original molecular simulation trajectories are not included because of their size and source-data constraints. `src/extract_rmsd_features.py` documents **only RMSD** feature extraction and requires access to the original trajectories. The nine energy features were supplied as `data/project3_energy_features.csv`; their extraction implementation is absent. Therefore, the modelling analysis can be reproduced from the committed tables, but the full raw-trajectory-to-features pipeline cannot.
+The original molecular simulation trajectories and raw energy time series are the author's own unpublished research data. They are intentionally not distributed in this public repository at this stage. `src/extract_rmsd_features.py` documents **only RMSD** feature extraction and requires access to the original trajectories. The nine energy features were supplied as `data/project3_energy_features.csv`; their extraction implementation is absent. Therefore, the modelling analysis can be reproduced from the committed tables, but the full raw-trajectory-to-features pipeline cannot.
 
-**Data provenance:** Three processed inputs are committed under `data/`: `project3_energy_features.csv` (96 rows), `project3_structure_features.csv` (126 rows) and `rank_by_distance_to_fit_deltaG_fep_BOOTSTRAP.csv` (95 rows). The exact upstream source publication, data ownership, trajectory generation protocol, and raw energy-feature construction cannot be established from this repository and must be supplied before claiming end-to-end reproducibility.
+**Data provenance:** Three processed inputs are committed under `data/`: `project3_energy_features.csv` (96 rows), `project3_structure_features.csv` (126 rows) and `rank_by_distance_to_fit_deltaG_fep_BOOTSTRAP.csv` (95 rows). The original trajectories belong to the author's research and are not currently available publicly. The trajectory generation protocol, energy units and original raw energy-feature construction code are not supplied, so end-to-end reproduction from raw simulation data is not yet possible. This restriction does not prevent reproduction of the downstream analysis from the committed processed tables.
 
 ## Limitations
 
