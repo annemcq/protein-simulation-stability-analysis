@@ -52,18 +52,83 @@ The final models use 12 features in total.
 
 ### Feature definitions and reproducibility status
 
-For the early interaction-energy series \(v_i = \Delta V_i\), let \(n\) denote the number of frames **used for the early-window summary**. The definitions below separate **relations verified from the committed numeric table**, conventional interpretations, and unverified inferences. There is no original energy-extraction implementation or raw energy trajectory in this repository.
+For the early interaction-energy series $v_i = \Delta V_i$, let $n$ denote the number of frames **used for the early-window summary**. The definitions below separate **relations verified from the committed numeric table**, conventional interpretations, and unverified inferences. There is no original energy-extraction implementation or raw energy trajectory in this repository.
 
 | Column | Definition or numerical relation | Evidence |
 |---|---|---|
-| `mean_deltaV` | \(\bar v = \sum_i v_i/n\) | Conventional interpretation of name; raw-data calculation unavailable |
-| `std_deltaV` | \(\sqrt{\sum_i(v_i-\bar v)^2/n}\), or its sample-standard-deviation variant | Conventional interpretation; `ddof` unknown |
+| `mean_deltaV` | $`\bar v = \sum_i v_i/n`$ | Conventional interpretation of name; raw-data calculation unavailable |
+| `std_deltaV` | $`\sqrt{\sum_i(v_i-\bar v)^2/n}`$, or its sample-standard-deviation variant | Conventional interpretation; `ddof` unknown |
 | `min_deltaV`, `max_deltaV` | Minimum and maximum of the early series | Conventional interpretation |
-| `range_deltaV` | \(\max(v)-\min(v)\) | **Verified exactly** for all 96 committed rows |
-| `slope_deltaV` | A linear trend in \(\Delta V\), plausibly least-squares slope against frame index | Inferred; exact time/index convention unverified |
+| `range_deltaV` | $`\max(v)-\min(v)`$ | **Verified exactly** for all 96 committed rows |
+| `slope_deltaV` | A linear trend in $`\Delta V`$, plausibly least-squares slope against frame index | Inferred; exact time/index convention unverified |
 | `drift_deltaV` | Difference between later and earlier segment means; approximately consistent with last-half minus first-half | **Inferred, not recovered exactly**; relationship to slope suggests segment-centre separation ≈99 frames |
 | `contrast_deltaV` | Difference between separated segment means; approximately consistent with last ≈30% minus first ≈30% | **Inferred, not recovered exactly**; relationship to slope suggests separation ≈137 frames |
-| `fluct_deltaV` | \(\mathrm{std\_deltaV}/|\mathrm{mean\_deltaV}|\) | **Numerically verified** for all 96 rows to maximum absolute difference 0.00155, consistent with rounding |
+| `fluct_deltaV` | # Protein Simulation Stability Analysis
+
+[![Tests](https://github.com/annemcq/protein-simulation-stability-analysis/actions/workflows/tests.yml/badge.svg)](https://github.com/annemcq/protein-simulation-stability-analysis/actions/workflows/tests.yml)
+
+Machine-learning analysis of whether early energy and structural signals from molecular simulations can help predict later deviation from expected thermodynamic behaviour.
+
+The main question was:
+
+> Can information from the beginning of a simulation help identify systems that are likely to behave abnormally later?
+
+## Dataset
+
+The analysis uses molecular simulation data from approximately 90 protein systems.
+
+For each system, energy trajectories were available for three components:
+
+- protein complex
+- complex without peptide
+- peptide
+
+These were combined into an interaction-energy trajectory:
+
+$$
+\Delta V(t) = E_{\mathrm{complex}} -
+(E_{\mathrm{nopep}} + E_{\mathrm{pep}})
+$$
+
+Structural trajectories were also available and used to calculate RMSD-based features.
+
+Only the first 20% of each trajectory was used for feature extraction, so that the models only had access to information from the early part of the simulation.
+
+The supplied processed CSVs contain **96 energy-feature systems**, **126 structural-feature systems**, and **95 target-table systems**, each with a unique normalised `pdb` key. Inner joining all three tables on this key leaves **90 systems** (the 90 IDs common to all three tables). This is an intersection of identifiers, not a claim that additional trajectories were excluded during feature extraction. I removed the lowest and highest 1% of the target distribution (`Perp_dist`) before defining the median split, which removed 2 systems and left 88 systems for analysis.
+
+## Features
+
+Energy features summarize the early ΔV trajectory:
+
+- mean and standard deviation
+- minimum, maximum and range
+- slope
+- drift
+- contrast between different parts of the early trajectory
+- fluctuation ratio
+
+Three structural features were calculated from RMSD relative to the first trajectory frame:
+
+- mean RMSD
+- RMSD standard deviation
+- RMSD slope
+
+The final models use 12 features in total.
+
+### Feature definitions and reproducibility status
+
+For the early interaction-energy series $v_i = \Delta V_i$, let $n$ denote the number of frames **used for the early-window summary**. The definitions below separate **relations verified from the committed numeric table**, conventional interpretations, and unverified inferences. There is no original energy-extraction implementation or raw energy trajectory in this repository.
+
+| Column | Definition or numerical relation | Evidence |
+|---|---|---|
+| `mean_deltaV` | $`\bar v = \sum_i v_i/n`$ | Conventional interpretation of name; raw-data calculation unavailable |
+| `std_deltaV` | $`\sqrt{\sum_i(v_i-\bar v)^2/n}`$, or its sample-standard-deviation variant | Conventional interpretation; `ddof` unknown |
+| `min_deltaV`, `max_deltaV` | Minimum and maximum of the early series | Conventional interpretation |
+| `range_deltaV` | $`\max(v)-\min(v)`$ | **Verified exactly** for all 96 committed rows |
+| `slope_deltaV` | A linear trend in $`\Delta V`$, plausibly least-squares slope against frame index | Inferred; exact time/index convention unverified |
+| `drift_deltaV` | Difference between later and earlier segment means; approximately consistent with last-half minus first-half | **Inferred, not recovered exactly**; relationship to slope suggests segment-centre separation ≈99 frames |
+| `contrast_deltaV` | Difference between separated segment means; approximately consistent with last ≈30% minus first ≈30% | **Inferred, not recovered exactly**; relationship to slope suggests separation ≈137 frames |
+| `fluct_deltaV` | \frac{\mathrm{std\_deltaV}}{\lvert\mathrm{mean\_deltaV}\rvert}`$ | **Numerically verified** for all 96 rows to maximum absolute difference 0.00155, consistent with rounding |
 | `mean_rmsd`, `std_rmsd`, `slope_rmsd` | Mean, population standard deviation and least-squares slope of RMSD against early-frame index | Implemented in `src/extract_rmsd_features.py` |
 
 The supplied energy-feature CSV reports `n_frames = 1000` for every system. The original pipeline says it uses the first 20% of each simulation, suggesting 200 early frames for a 1,000-frame trajectory, **but the meaning of `n_frames` and exact extraction operations cannot be independently established without the missing raw-data code**.
@@ -72,7 +137,7 @@ The supplied energy-feature CSV reports `n_frames = 1000` for every system. The 
 
 ### Target definition (verified from the committed target CSV)
 
-Let \(x=\mathrm{Ref\_rank}\) and \(y=\Delta G_{\mathrm{fep}}\). An ordinary least-squares regression of \(y\) on \(x\) across the **95 rows in the target table** gives
+Let $x=\mathrm{Ref\_rank}$ and $y=\Delta G_{\mathrm{fep}}$. An ordinary least-squares regression of $y$ on $x$ across the **95 rows in the target table** gives
 
 $$
 \widehat y = a + bx,\qquad
@@ -86,7 +151,7 @@ $$
 \mathrm{Perp\_dist} = \frac{|\mathrm{Residual}|}{\sqrt{1+b^2}}.
 $$
 
-These relations reproduce the committed target data to about \(10^{-14}\). Their interpretation is therefore established from the numeric table **even though the upstream script was not provided**. The sample correlation between `Ref_rank` and `ΔG_fep` is only about **0.0406**, so the fitted line is almost flat. Thus `Perp_dist` is essentially absolute distance from a near-constant fitted free-energy level, **not evidence of a strong expected free-energy trend**. The units of this geometric distance depend on the plotted coordinate scales and are not an independently verified physical energy unit.
+These relations reproduce the committed target data to about $10^{-14}$. Their interpretation is therefore established from the numeric table **even though the upstream script was not provided**. The sample correlation between `Ref_rank` and `ΔG_fep` is only about **0.0406**, so the fitted line is almost flat. Thus `Perp_dist` is essentially absolute distance from a near-constant fitted free-energy level, **not evidence of a strong expected free-energy trend**. The units of this geometric distance depend on the plotted coordinate scales and are not an independently verified physical energy unit.
 
 `ΔG_fep` is labelled as a computed free-energy estimate and `σ(ΔG)` as its bootstrap uncertainty; the reference state and units are not supplied. `Ref_rank` is a reference ranking coordinate, but how it was originally generated is undocumented. These provenance gaps should remain explicit.
 
@@ -301,9 +366,9 @@ python -m pytest
 
 The processed datasets required to reproduce the model training and evaluation are included in the repository.
 
-The original molecular simulation trajectories and raw energy time series are the author's own unpublished research data. They are intentionally not distributed in this public repository at this stage. `src/extract_rmsd_features.py` documents **only RMSD** feature extraction and requires access to the original trajectories. The nine energy features were supplied as `data/project3_energy_features.csv`; their extraction implementation is absent. Therefore, the modelling analysis can be reproduced from the committed tables, but the full raw-trajectory-to-features pipeline cannot.
+The original molecular simulation trajectories and raw energy time series are unpublished data generated as part of the author's research. They are intentionally not distributed in this public repository at this stage. `src/extract_rmsd_features.py` documents **only RMSD** feature extraction and requires access to the original trajectories. The nine energy features were supplied as `data/project3_energy_features.csv`; their extraction implementation is absent. Therefore, the modelling analysis can be reproduced from the committed tables, but the full raw-trajectory-to-features pipeline cannot.
 
-**Data provenance:** Three processed inputs are committed under `data/`: `project3_energy_features.csv` (96 rows), `project3_structure_features.csv` (126 rows) and `rank_by_distance_to_fit_deltaG_fep_BOOTSTRAP.csv` (95 rows). The original trajectories belong to the author's research and are not currently available publicly. The trajectory generation protocol, energy units and original raw energy-feature construction code are not supplied, so end-to-end reproduction from raw simulation data is not yet possible. This restriction does not prevent reproduction of the downstream analysis from the committed processed tables.
+**Data provenance:** Three processed inputs are committed under `data/`: `project3_energy_features.csv` (96 rows), `project3_structure_features.csv` (126 rows) and `rank_by_distance_to_fit_deltaG_fep_BOOTSTRAP.csv` (95 rows). The original trajectories were generated as part of the author's research and are not publicly available. Any future release should respect relevant research-group, collaborator and institutional agreements. The trajectory generation protocol, energy units and original raw energy-feature construction code are not supplied, so end-to-end reproduction from raw simulation data is not yet possible. This restriction does not prevent reproduction of the downstream analysis from the committed processed tables.
 
 ## Limitations
 
