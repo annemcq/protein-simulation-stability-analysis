@@ -235,7 +235,8 @@ protein-simulation-stability-analysis/
 │   └── shap_analysis.py
 │
 ├── tests/
-│   └── test_models_and_stats.py
+│   ├── test_models_and_stats.py
+│   └── test_processed_data_provenance.py
 │
 ├── .github/workflows/tests.yml
 ├── LICENSE
