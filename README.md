@@ -29,7 +29,7 @@ Structural trajectories were also available and used to calculate RMSD-based fea
 
 Only the first 20% of each trajectory was used for feature extraction, so that the models only had access to information from the early part of the simulation.
 
-After merging the available energy, structural and target data, 90 systems were available. I removed the lowest and highest 1% of the target distribution (`Perp_dist`) before defining the median split, which removed 2 systems and left 88 systems for analysis.
+The supplied processed CSVs contain **96 energy-feature systems**, **126 structural-feature systems**, and **95 target-table systems**, each with a unique normalised `pdb` key. Inner joining all three tables on this key leaves **90 systems** (the 90 IDs common to all three tables). This is an intersection of identifiers, not a claim that additional trajectories were excluded during feature extraction. I removed the lowest and highest 1% of the target distribution (`Perp_dist`) before defining the median split, which removed 2 systems and left 88 systems for analysis.
 
 ## Features
 
@@ -49,6 +49,18 @@ Three structural features were calculated from RMSD relative to the first trajec
 - RMSD slope
 
 The final models use 12 features in total.
+
+### Feature definitions and reproducibility status
+
+The interaction-energy time series is defined above as `ΔV(t)`. The provided feature table contains nine summaries: `mean_deltaV`, `std_deltaV`, `min_deltaV`, `max_deltaV`, `range_deltaV`, `slope_deltaV`, `drift_deltaV`, `contrast_deltaV`, and `fluct_deltaV`. Mean, standard deviation, minimum, maximum, and range have their usual descriptive-statistics meanings. The existing repository **does not contain the original code or a verified mathematical specification** for the last four (slope's time/index convention, drift, contrast, and fluctuation ratio). Their exact window definitions, denominators, and handling of units cannot be recovered reliably from the aggregate CSV alone. In particular, do not treat a guessed formula for drift, contrast or fluctuation ratio as the formula used to generate the published numbers.
+
+The energy features' physical units cannot be independently verified from the supplied feature table. If the underlying component energies share an energy unit, mean, standard deviation, minimum, maximum, range, drift, and contrast inherit that unit; slope additionally depends on whether time or frame index was used; fluctuation ratio may be dimensionless depending on its original definition. **These conditional statements are not verified unit assignments.** The `n_frames` column records 1,000 for the displayed processed rows; the README's first-20%-of-trajectory description is not an independently reproducible feature-extraction pipeline without the source trajectories and missing energy extraction code.
+
+For the structural features, `src/extract_rmsd_features.py` computes RMSD relative to the first trajectory frame on the first 20% of frames, then its mean, population standard deviation and a least-squares linear slope against early-frame index. MDTraj's RMSD output is in **nanometres** (for consistently specified trajectory/topology coordinates), so the mean and standard deviation are in nm and the slope in nm per frame index.
+
+### What the target-table columns mean (and what remains undocumented)
+
+The source table includes `ΔG_fep`, `Ref_rank`, `Fit_ŷ`, `Residual`, and `Perp_dist`. `ΔG_fep` denotes a free-energy-perturbation estimate; `Ref_rank` is a reference-ranking field; `Perp_dist` is described by the upstream table as distance from a fitted relationship and is the continuous target used here. The repository does **not** contain the original fit-generating script or a data dictionary specifying the precise geometry of `Perp_dist`, the construction of `Ref_rank`, or the reference state and physical units of `ΔG_fep`. As a result, their exact definitions and units remain **unverified**; numerical `Perp_dist` values are used as provided rather than recomputed. This is an outstanding provenance limitation, not evidence that those quantities are dimensionless.
 
 ## Target
 
@@ -72,7 +84,7 @@ ROC-AUC is used as the main evaluation metric.
 
 ## Evaluation strategy
 
-I initially evaluated the models using a single stratified 80/20 train/test split. Because the test set contains only 18 systems, the resulting ROC-AUC is sensitive to which observations happen to be held out.
+I initially evaluated the models using a single stratified 80/20 train/test split (**ROC-AUC 0.543 for Logistic Regression and 0.549 for Random Forest**, based on the reported original split). These are **not** the 30-holdout means reported below. Because the test set contains only 18 systems, the resulting ROC-AUC is sensitive to which observations happen to be held out.
 
 I therefore added two complementary resampling analyses.
 
@@ -152,7 +164,7 @@ However, these importances should be interpreted cautiously. The Random Forest d
 
 The main result of the project was not a high-performing classifier. Instead, the analysis showed how easily conclusions can change when working with a small scientific dataset.
 
-The initial holdout analysis produced a moderately positive Logistic Regression estimate, but repeated 5-fold cross-validation reduced this to **0.545 ± 0.038 ROC-AUC**. The label-permutation test also failed to reject the null hypothesis (**p = 0.244**).
+The original single holdout yielded ROC-AUC 0.543 (Logistic Regression) and 0.549 (Random Forest), whereas the **30 repeated holdouts** averaged 0.597 for Logistic Regression. Repeated 5-fold cross-validation reduced this to **0.545 ± 0.038 ROC-AUC**. The label-permutation test also failed to reject the null hypothesis (**p = 0.244**).
 
 Adding simple RMSD-based structural features did not produce a strong predictive model, and the Random Forest did not show a clear improvement over the dummy baseline.
 
@@ -176,13 +188,15 @@ protein-simulation-stability-analysis/
 │   ├── logreg_permutation_null.csv
 │   ├── logreg_permutation_test.csv
 │   ├── logreg_permutation_test.png
+│   ├── repeated_5fold_model_comparison.csv
 │   ├── resampling_protocol_comparison.csv
 │   ├── shap_feature_importance.csv
 │   └── shap_feature_importance.png
 │
 ├── src/
 │   ├── build_dataset.py
-│   ├── extract_energy_features.py
+│   ├── __init__.py
+│   ├── extract_rmsd_features.py
 │   ├── train_models.py
 │   ├── repeated_cv_evaluation.py
 │   ├── compare_resampling_protocols.py
@@ -192,13 +206,16 @@ protein-simulation-stability-analysis/
 ├── tests/
 │   └── test_models_and_stats.py
 │
+├── .github/workflows/tests.yml
+├── LICENSE
+├── pytest.ini
 ├── requirements.txt
 └── README.md
 ```
 
 ## Reproducing the analysis
 
-Install the dependencies:
+Install the dependencies (currently minimum-version constraints rather than an exact reproducible lockfile):
 
 ```bash
 pip install -r requirements.txt
@@ -252,7 +269,9 @@ python -m pytest
 
 The processed datasets required to reproduce the model training and evaluation are included in the repository.
 
-The original molecular simulation trajectories are not included because of their size and source-data constraints. `src/extract_energy_features.py` documents the RMSD feature-extraction step but requires access to the original trajectory files.
+The original molecular simulation trajectories are not included because of their size and source-data constraints. `src/extract_rmsd_features.py` documents **only RMSD** feature extraction and requires access to the original trajectories. The nine energy features were supplied as `data/project3_energy_features.csv`; their extraction implementation is absent. Therefore, the modelling analysis can be reproduced from the committed tables, but the full raw-trajectory-to-features pipeline cannot.
+
+**Data provenance:** Three processed inputs are committed under `data/`: `project3_energy_features.csv` (96 rows), `project3_structure_features.csv` (126 rows) and `rank_by_distance_to_fit_deltaG_fep_BOOTSTRAP.csv` (95 rows). The exact upstream source publication, data ownership, trajectory generation protocol, and raw energy-feature construction cannot be established from this repository and must be supplied before claiming end-to-end reproducibility.
 
 ## Limitations
 
