@@ -29,7 +29,7 @@ Structural trajectories were also available and used to calculate RMSD-based fea
 
 Only the first 20% of each trajectory was used for feature extraction, so that the models only had access to information from the early part of the simulation.
 
-After merging the available energy, structural and target data, 90 systems were available. I removed the lowest and highest 1% of the target distribution (`Perp_dist`) before defining the median split, which removed 2 systems and left 88 systems for analysis.
+The supplied processed CSVs contain **96 energy-feature systems**, **126 structural-feature systems**, and **95 target-table systems**, each with a unique normalised `pdb` key. Inner joining all three tables on this key leaves **90 systems** (the 90 IDs common to all three tables). This is an intersection of identifiers, not a claim that additional trajectories were excluded during feature extraction. I removed the lowest and highest 1% of the target distribution (`Perp_dist`) before defining the median split, which removed 2 systems and left 88 systems for analysis.
 
 ## Features
 
@@ -49,6 +49,49 @@ Three structural features were calculated from RMSD relative to the first trajec
 - RMSD slope
 
 The final models use 12 features in total.
+
+### Feature definitions and reproducibility status
+
+For the early interaction-energy series \(v_i = \Delta V_i\), let \(n\) denote the number of frames **used for the early-window summary**. The definitions below separate **relations verified from the committed numeric table**, conventional interpretations, and unverified inferences. There is no original energy-extraction implementation or raw energy trajectory in this repository.
+
+| Column | Definition or numerical relation | Evidence |
+|---|---|---|
+| `mean_deltaV` | \(\bar v = \sum_i v_i/n\) | Conventional interpretation of name; raw-data calculation unavailable |
+| `std_deltaV` | \(\sqrt{\sum_i(v_i-\bar v)^2/n}\), or its sample-standard-deviation variant | Conventional interpretation; `ddof` unknown |
+| `min_deltaV`, `max_deltaV` | Minimum and maximum of the early series | Conventional interpretation |
+| `range_deltaV` | \(\max(v)-\min(v)\) | **Verified exactly** for all 96 committed rows |
+| `slope_deltaV` | A linear trend in \(\Delta V\), plausibly least-squares slope against frame index | Inferred; exact time/index convention unverified |
+| `drift_deltaV` | Difference between later and earlier segment means; approximately consistent with last-half minus first-half | **Inferred, not recovered exactly**; relationship to slope suggests segment-centre separation ≈99 frames |
+| `contrast_deltaV` | Difference between separated segment means; approximately consistent with last ≈30% minus first ≈30% | **Inferred, not recovered exactly**; relationship to slope suggests separation ≈137 frames |
+| `fluct_deltaV` | \(\mathrm{std\_deltaV}/|\mathrm{mean\_deltaV}|\) | **Numerically verified** for all 96 rows to maximum absolute difference 0.00155, consistent with rounding |
+| `mean_rmsd`, `std_rmsd`, `slope_rmsd` | Mean, population standard deviation and least-squares slope of RMSD against early-frame index | Implemented in `src/extract_rmsd_features.py` |
+
+The supplied energy-feature CSV reports `n_frames = 1000` for every system. The original pipeline says it uses the first 20% of each simulation, suggesting 200 early frames for a 1,000-frame trajectory, **but the meaning of `n_frames` and exact extraction operations cannot be independently established without the missing raw-data code**.
+
+**Units:** The repository does not state the energy unit or the physical reference state of its energy traces. If all input energies use the same physical energy unit, the additive summary statistics above carry that unit; the slope would carry that unit per frame if regressed against frame index. The fluctuation ratio defined above is dimensionless. MDTraj reports RMSD in nanometres; the script's mean and standard deviation are therefore in nm, and its slope is in nm/frame index if frames were sampled at equal increments. No physical time step is documented.
+
+### Target definition (verified from the committed target CSV)
+
+Let \(x=\mathrm{Ref\_rank}\) and \(y=\Delta G_{\mathrm{fep}}\). An ordinary least-squares regression of \(y\) on \(x\) across the **95 rows in the target table** gives
+
+$$
+\widehat y = a + bx,\qquad
+a = -42.2328382575,\qquad b = 0.0174392514.
+$$
+
+The table's `Fit_ŷ` agrees with this fitted line to numerical precision. The remaining columns satisfy
+
+$$
+\mathrm{Residual} = \Delta G_{\mathrm{fep}} - \widehat y,\qquad
+\mathrm{Perp\_dist} = \frac{|\mathrm{Residual}|}{\sqrt{1+b^2}}.
+$$
+
+These relations reproduce the committed target data to about \(10^{-14}\). Their interpretation is therefore established from the numeric table **even though the upstream script was not provided**. The sample correlation between `Ref_rank` and `ΔG_fep` is only about **0.0406**, so the fitted line is almost flat. Thus `Perp_dist` is essentially absolute distance from a near-constant fitted free-energy level, **not evidence of a strong expected free-energy trend**. The units of this geometric distance depend on the plotted coordinate scales and are not an independently verified physical energy unit.
+
+`ΔG_fep` is labelled as a computed free-energy estimate and `σ(ΔG)` as its bootstrap uncertainty; the reference state and units are not supplied. `Ref_rank` is a reference ranking coordinate, but how it was originally generated is undocumented. These provenance gaps should remain explicit.
+
+For model training, the three input tables are inner-joined by normalised `pdb` ID (96 energy rows, 126 structural rows, 95 target rows → 90 matched systems); after excluding values outside the 1st and 99th `Perp_dist` percentiles, **88 systems** remain. Their `Perp_dist` median is **8.4044**, producing 44 observations per class.
+
 
 ## Target
 
@@ -72,7 +115,7 @@ ROC-AUC is used as the main evaluation metric.
 
 ## Evaluation strategy
 
-I initially evaluated the models using a single stratified 80/20 train/test split. Because the test set contains only 18 systems, the resulting ROC-AUC is sensitive to which observations happen to be held out.
+I initially evaluated the models using a single stratified 80/20 train/test split (**ROC-AUC 0.543 for Logistic Regression and 0.549 for Random Forest**, based on the reported original split). These are **not** the 30-holdout means reported below. Because the test set contains only 18 systems, the resulting ROC-AUC is sensitive to which observations happen to be held out.
 
 I therefore added two complementary resampling analyses.
 
@@ -152,7 +195,7 @@ However, these importances should be interpreted cautiously. The Random Forest d
 
 The main result of the project was not a high-performing classifier. Instead, the analysis showed how easily conclusions can change when working with a small scientific dataset.
 
-The initial holdout analysis produced a moderately positive Logistic Regression estimate, but repeated 5-fold cross-validation reduced this to **0.545 ± 0.038 ROC-AUC**. The label-permutation test also failed to reject the null hypothesis (**p = 0.244**).
+The original single holdout yielded ROC-AUC 0.543 (Logistic Regression) and 0.549 (Random Forest), whereas the **30 repeated holdouts** averaged 0.597 for Logistic Regression. Repeated 5-fold cross-validation reduced this to **0.545 ± 0.038 ROC-AUC**. The label-permutation test also failed to reject the null hypothesis (**p = 0.244**).
 
 Adding simple RMSD-based structural features did not produce a strong predictive model, and the Random Forest did not show a clear improvement over the dummy baseline.
 
@@ -176,13 +219,15 @@ protein-simulation-stability-analysis/
 │   ├── logreg_permutation_null.csv
 │   ├── logreg_permutation_test.csv
 │   ├── logreg_permutation_test.png
+│   ├── repeated_5fold_model_comparison.csv
 │   ├── resampling_protocol_comparison.csv
 │   ├── shap_feature_importance.csv
 │   └── shap_feature_importance.png
 │
 ├── src/
 │   ├── build_dataset.py
-│   ├── extract_energy_features.py
+│   ├── __init__.py
+│   ├── extract_rmsd_features.py
 │   ├── train_models.py
 │   ├── repeated_cv_evaluation.py
 │   ├── compare_resampling_protocols.py
@@ -190,15 +235,19 @@ protein-simulation-stability-analysis/
 │   └── shap_analysis.py
 │
 ├── tests/
-│   └── test_models_and_stats.py
+│   ├── test_models_and_stats.py
+│   └── test_processed_data_provenance.py
 │
+├── .github/workflows/tests.yml
+├── LICENSE
+├── pytest.ini
 ├── requirements.txt
 └── README.md
 ```
 
 ## Reproducing the analysis
 
-Install the dependencies:
+Install the dependencies (currently minimum-version constraints rather than an exact reproducible lockfile):
 
 ```bash
 pip install -r requirements.txt
@@ -252,7 +301,9 @@ python -m pytest
 
 The processed datasets required to reproduce the model training and evaluation are included in the repository.
 
-The original molecular simulation trajectories are not included because of their size and source-data constraints. `src/extract_energy_features.py` documents the RMSD feature-extraction step but requires access to the original trajectory files.
+The original molecular simulation trajectories and raw energy time series are the author's own unpublished research data. They are intentionally not distributed in this public repository at this stage. `src/extract_rmsd_features.py` documents **only RMSD** feature extraction and requires access to the original trajectories. The nine energy features were supplied as `data/project3_energy_features.csv`; their extraction implementation is absent. Therefore, the modelling analysis can be reproduced from the committed tables, but the full raw-trajectory-to-features pipeline cannot.
+
+**Data provenance:** Three processed inputs are committed under `data/`: `project3_energy_features.csv` (96 rows), `project3_structure_features.csv` (126 rows) and `rank_by_distance_to_fit_deltaG_fep_BOOTSTRAP.csv` (95 rows). The original trajectories belong to the author's research and are not currently available publicly. The trajectory generation protocol, energy units and original raw energy-feature construction code are not supplied, so end-to-end reproduction from raw simulation data is not yet possible. This restriction does not prevent reproduction of the downstream analysis from the committed processed tables.
 
 ## Limitations
 

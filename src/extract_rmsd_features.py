@@ -1,5 +1,5 @@
 # ============================================================
-# EXTRACT STRUCTURAL FEATURES (RMSD)
+# EXTRACT RMSD FEATURES (STRUCTURAL TRAJECTORY)
 # ============================================================
 
 import os
