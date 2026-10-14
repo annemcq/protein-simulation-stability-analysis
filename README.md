@@ -52,15 +52,46 @@ The final models use 12 features in total.
 
 ### Feature definitions and reproducibility status
 
-The interaction-energy time series is defined above as `ΔV(t)`. The provided feature table contains nine summaries: `mean_deltaV`, `std_deltaV`, `min_deltaV`, `max_deltaV`, `range_deltaV`, `slope_deltaV`, `drift_deltaV`, `contrast_deltaV`, and `fluct_deltaV`. Mean, standard deviation, minimum, maximum, and range have their usual descriptive-statistics meanings. The existing repository **does not contain the original code or a verified mathematical specification** for the last four (slope's time/index convention, drift, contrast, and fluctuation ratio). Their exact window definitions, denominators, and handling of units cannot be recovered reliably from the aggregate CSV alone. In particular, do not treat a guessed formula for drift, contrast or fluctuation ratio as the formula used to generate the published numbers.
+For the early interaction-energy series \(v_i = \Delta V_i\), let \(n\) denote the number of frames **used for the early-window summary**. The definitions below separate **relations verified from the committed numeric table**, conventional interpretations, and unverified inferences. There is no original energy-extraction implementation or raw energy trajectory in this repository.
 
-The energy features' physical units cannot be independently verified from the supplied feature table. If the underlying component energies share an energy unit, mean, standard deviation, minimum, maximum, range, drift, and contrast inherit that unit; slope additionally depends on whether time or frame index was used; fluctuation ratio may be dimensionless depending on its original definition. **These conditional statements are not verified unit assignments.** The `n_frames` column records 1,000 for the displayed processed rows; the README's first-20%-of-trajectory description is not an independently reproducible feature-extraction pipeline without the source trajectories and missing energy extraction code.
+| Column | Definition or numerical relation | Evidence |
+|---|---|---|
+| `mean_deltaV` | \(\bar v = \sum_i v_i/n\) | Conventional interpretation of name; raw-data calculation unavailable |
+| `std_deltaV` | \(\sqrt{\sum_i(v_i-\bar v)^2/n}\), or its sample-standard-deviation variant | Conventional interpretation; `ddof` unknown |
+| `min_deltaV`, `max_deltaV` | Minimum and maximum of the early series | Conventional interpretation |
+| `range_deltaV` | \(\max(v)-\min(v)\) | **Verified exactly** for all 96 committed rows |
+| `slope_deltaV` | A linear trend in \(\Delta V\), plausibly least-squares slope against frame index | Inferred; exact time/index convention unverified |
+| `drift_deltaV` | Difference between later and earlier segment means; approximately consistent with last-half minus first-half | **Inferred, not recovered exactly**; relationship to slope suggests segment-centre separation ≈99 frames |
+| `contrast_deltaV` | Difference between separated segment means; approximately consistent with last ≈30% minus first ≈30% | **Inferred, not recovered exactly**; relationship to slope suggests separation ≈137 frames |
+| `fluct_deltaV` | \(\mathrm{std\_deltaV}/|\mathrm{mean\_deltaV}|\) | **Numerically verified** for all 96 rows to maximum absolute difference 0.00155, consistent with rounding |
+| `mean_rmsd`, `std_rmsd`, `slope_rmsd` | Mean, population standard deviation and least-squares slope of RMSD against early-frame index | Implemented in `src/extract_rmsd_features.py` |
 
-For the structural features, `src/extract_rmsd_features.py` computes RMSD relative to the first trajectory frame on the first 20% of frames, then its mean, population standard deviation and a least-squares linear slope against early-frame index. MDTraj's RMSD output is in **nanometres** (for consistently specified trajectory/topology coordinates), so the mean and standard deviation are in nm and the slope in nm per frame index.
+The supplied energy-feature CSV reports `n_frames = 1000` for every system. The original pipeline says it uses the first 20% of each simulation, suggesting 200 early frames for a 1,000-frame trajectory, **but the meaning of `n_frames` and exact extraction operations cannot be independently established without the missing raw-data code**.
 
-### What the target-table columns mean (and what remains undocumented)
+**Units:** The repository does not state the energy unit or the physical reference state of its energy traces. If all input energies use the same physical energy unit, the additive summary statistics above carry that unit; the slope would carry that unit per frame if regressed against frame index. The fluctuation ratio defined above is dimensionless. MDTraj reports RMSD in nanometres; the script's mean and standard deviation are therefore in nm, and its slope is in nm/frame index if frames were sampled at equal increments. No physical time step is documented.
 
-The source table includes `ΔG_fep`, `Ref_rank`, `Fit_ŷ`, `Residual`, and `Perp_dist`. `ΔG_fep` denotes a free-energy-perturbation estimate; `Ref_rank` is a reference-ranking field; `Perp_dist` is described by the upstream table as distance from a fitted relationship and is the continuous target used here. The repository does **not** contain the original fit-generating script or a data dictionary specifying the precise geometry of `Perp_dist`, the construction of `Ref_rank`, or the reference state and physical units of `ΔG_fep`. As a result, their exact definitions and units remain **unverified**; numerical `Perp_dist` values are used as provided rather than recomputed. This is an outstanding provenance limitation, not evidence that those quantities are dimensionless.
+### Target definition (verified from the committed target CSV)
+
+Let \(x=\mathrm{Ref\_rank}\) and \(y=\Delta G_{\mathrm{fep}}\). An ordinary least-squares regression of \(y\) on \(x\) across the **95 rows in the target table** gives
+
+$$
+\widehat y = a + bx,\qquad
+a = -42.2328382575,\qquad b = 0.0174392514.
+$$
+
+The table's `Fit_ŷ` agrees with this fitted line to numerical precision. The remaining columns satisfy
+
+$$
+\mathrm{Residual} = \Delta G_{\mathrm{fep}} - \widehat y,\qquad
+\mathrm{Perp\_dist} = \frac{|\mathrm{Residual}|}{\sqrt{1+b^2}}.
+$$
+
+These relations reproduce the committed target data to about \(10^{-14}\). Their interpretation is therefore established from the numeric table **even though the upstream script was not provided**. The sample correlation between `Ref_rank` and `ΔG_fep` is only about **0.0406**, so the fitted line is almost flat. Thus `Perp_dist` is essentially absolute distance from a near-constant fitted free-energy level, **not evidence of a strong expected free-energy trend**. The units of this geometric distance depend on the plotted coordinate scales and are not an independently verified physical energy unit.
+
+`ΔG_fep` is labelled as a computed free-energy estimate and `σ(ΔG)` as its bootstrap uncertainty; the reference state and units are not supplied. `Ref_rank` is a reference ranking coordinate, but how it was originally generated is undocumented. These provenance gaps should remain explicit.
+
+For model training, the three input tables are inner-joined by normalised `pdb` ID (96 energy rows, 126 structural rows, 95 target rows → 90 matched systems); after excluding values outside the 1st and 99th `Perp_dist` percentiles, **88 systems** remain. Their `Perp_dist` median is **8.4044**, producing 44 observations per class.
+
 
 ## Target
 
