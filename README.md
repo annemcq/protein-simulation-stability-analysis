@@ -63,72 +63,7 @@ For the early interaction-energy series $v_i = \Delta V_i$, let $n$ denote the n
 | `slope_deltaV` | A linear trend in $`\Delta V`$, plausibly least-squares slope against frame index | Inferred; exact time/index convention unverified |
 | `drift_deltaV` | Difference between later and earlier segment means; approximately consistent with last-half minus first-half | **Inferred, not recovered exactly**; relationship to slope suggests segment-centre separation ≈99 frames |
 | `contrast_deltaV` | Difference between separated segment means; approximately consistent with last ≈30% minus first ≈30% | **Inferred, not recovered exactly**; relationship to slope suggests separation ≈137 frames |
-| `fluct_deltaV` | # Protein Simulation Stability Analysis
-
-[![Tests](https://github.com/annemcq/protein-simulation-stability-analysis/actions/workflows/tests.yml/badge.svg)](https://github.com/annemcq/protein-simulation-stability-analysis/actions/workflows/tests.yml)
-
-Machine-learning analysis of whether early energy and structural signals from molecular simulations can help predict later deviation from expected thermodynamic behaviour.
-
-The main question was:
-
-> Can information from the beginning of a simulation help identify systems that are likely to behave abnormally later?
-
-## Dataset
-
-The analysis uses molecular simulation data from approximately 90 protein systems.
-
-For each system, energy trajectories were available for three components:
-
-- protein complex
-- complex without peptide
-- peptide
-
-These were combined into an interaction-energy trajectory:
-
-$$
-\Delta V(t) = E_{\mathrm{complex}} -
-(E_{\mathrm{nopep}} + E_{\mathrm{pep}})
-$$
-
-Structural trajectories were also available and used to calculate RMSD-based features.
-
-Only the first 20% of each trajectory was used for feature extraction, so that the models only had access to information from the early part of the simulation.
-
-The supplied processed CSVs contain **96 energy-feature systems**, **126 structural-feature systems**, and **95 target-table systems**, each with a unique normalised `pdb` key. Inner joining all three tables on this key leaves **90 systems** (the 90 IDs common to all three tables). This is an intersection of identifiers, not a claim that additional trajectories were excluded during feature extraction. I removed the lowest and highest 1% of the target distribution (`Perp_dist`) before defining the median split, which removed 2 systems and left 88 systems for analysis.
-
-## Features
-
-Energy features summarize the early ΔV trajectory:
-
-- mean and standard deviation
-- minimum, maximum and range
-- slope
-- drift
-- contrast between different parts of the early trajectory
-- fluctuation ratio
-
-Three structural features were calculated from RMSD relative to the first trajectory frame:
-
-- mean RMSD
-- RMSD standard deviation
-- RMSD slope
-
-The final models use 12 features in total.
-
-### Feature definitions and reproducibility status
-
-For the early interaction-energy series $v_i = \Delta V_i$, let $n$ denote the number of frames **used for the early-window summary**. The definitions below separate **relations verified from the committed numeric table**, conventional interpretations, and unverified inferences. There is no original energy-extraction implementation or raw energy trajectory in this repository.
-
-| Column | Definition or numerical relation | Evidence |
-|---|---|---|
-| `mean_deltaV` | $`\bar v = \sum_i v_i/n`$ | Conventional interpretation of name; raw-data calculation unavailable |
-| `std_deltaV` | $`\sqrt{\sum_i(v_i-\bar v)^2/n}`$, or its sample-standard-deviation variant | Conventional interpretation; `ddof` unknown |
-| `min_deltaV`, `max_deltaV` | Minimum and maximum of the early series | Conventional interpretation |
-| `range_deltaV` | $`\max(v)-\min(v)`$ | **Verified exactly** for all 96 committed rows |
-| `slope_deltaV` | A linear trend in $`\Delta V`$, plausibly least-squares slope against frame index | Inferred; exact time/index convention unverified |
-| `drift_deltaV` | Difference between later and earlier segment means; approximately consistent with last-half minus first-half | **Inferred, not recovered exactly**; relationship to slope suggests segment-centre separation ≈99 frames |
-| `contrast_deltaV` | Difference between separated segment means; approximately consistent with last ≈30% minus first ≈30% | **Inferred, not recovered exactly**; relationship to slope suggests separation ≈137 frames |
-| `fluct_deltaV` | \frac{\mathrm{std\_deltaV}}{\lvert\mathrm{mean\_deltaV}\rvert}`$ | **Numerically verified** for all 96 rows to maximum absolute difference 0.00155, consistent with rounding |
+| `fluct_deltaV` | $`\frac{\mathrm{std\_deltaV}}{\lvert\mathrm{mean\_deltaV}\rvert}`$ | **Numerically verified** for all 96 rows to maximum absolute difference 0.00155, consistent with rounding |
 | `mean_rmsd`, `std_rmsd`, `slope_rmsd` | Mean, population standard deviation and least-squares slope of RMSD against early-frame index | Implemented in `src/extract_rmsd_features.py` |
 
 The supplied energy-feature CSV reports `n_frames = 1000` for every system. The original pipeline says it uses the first 20% of each simulation, suggesting 200 early frames for a 1,000-frame trajectory, **but the meaning of `n_frames` and exact extraction operations cannot be independently established without the missing raw-data code**.
